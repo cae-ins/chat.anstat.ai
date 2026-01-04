@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deepseek-7b
+  namespace: vllm-chat
+  labels:
+    app: deepseek-7b
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: deepseek-7b
+  template:
+    metadata:
+      labels:
+        app: deepseek-7b
+    spec:
+      volumes:
+      - name: cache-volume
+        persistentVolumeClaim:
+          claimName: gemma3-cache
+      - name: shm
+        emptyDir:
+          medium: Memory
+          sizeLimit: "4Gi"
+      containers:
+      - name: deepseek
+        image: vllm/vllm-openai:v0.10.0
+        command: ["/bin/sh", "-c"]
+        args: [
+          "vllm serve deepseek-ai/DeepSeek-R1-Distill-Qwen-7B --dtype=half --tensor-parallel-size 1 --max-model-len 4096 --max-num-batched-tokens 4096 --max-num-seqs 12 --trust-remote-code --gpu-memory-utilization 0.80"
+        ]
+        env:
+        - name: HUGGING_FACE_HUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: hf-token-secret
+              key: token
+        ports:
+        - containerPort: 8000
+        resources:
+          limits:
+            cpu: "8"
+            memory: 20G
+            nvidia.com/gpu: "1"
+          requests:
+            cpu: "2"
+            memory: 8G
+            nvidia.com/gpu: "1"
+        volumeMounts:
+        - mountPath: /root/.cache/huggingface
+          name: cache-volume
+        - name: shm
+          mountPath: /dev/shm

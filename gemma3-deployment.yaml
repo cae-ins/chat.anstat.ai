@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gemma3-1b
+  namespace: vllm-chat
+  labels:
+    app: gemma3-1b
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gemma3-1b
+  template:
+    metadata:
+      labels:
+        app: gemma3-1b
+    spec:
+      volumes:
+      - name: cache-volume
+        persistentVolumeClaim:
+          claimName: gemma3-cache
+      - name: shm
+        emptyDir:
+          medium: Memory
+          sizeLimit: "4Gi"
+      containers:
+      - name: gemma3-1b
+        image: vllm/vllm-openai:v0.10.0
+        command: ["/bin/sh", "-c"]
+        args: [
+          "vllm serve google/gemma-3-1b-it --dtype=float16 --tensor-parallel-size 1 --max-model-len 4096 --max-num-batched-tokens 4096 --trust-remote-code --gpu-memory-utilization 0.85"
+        ]
+        env:
+        - name: HUGGING_FACE_HUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: hf-token-secret
+              key: token
+        ports:
+        - containerPort: 8000
+        resources:
+          limits:
+            cpu: "8"
+            memory: 16G
+            nvidia.com/gpu: "1"
+          requests:
+            cpu: "2"
+            memory: 4G
+            nvidia.com/gpu: "1"
+        volumeMounts:
+        - mountPath: /root/.cache/huggingface
+          name: cache-volume
+        - name: shm
+          mountPath: /dev/shm
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 300
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 5
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 300
+          periodSeconds: 10
+          timeoutSeconds: 10
+          failureThreshold: 3

@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qwen-7b
+  namespace: vllm-chat
+  labels:
+    app: qwen-7b
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: qwen-7b
+  template:
+    metadata:
+      labels:
+        app: qwen-7b
+    spec:
+      volumes:
+      - name: cache-volume
+        persistentVolumeClaim:
+          claimName: gemma3-cache
+      - name: shm
+        emptyDir:
+          medium: Memory
+          sizeLimit: "4Gi"
+      containers:
+      - name: qwen
+        image: vllm/vllm-openai:v0.10.0
+        command: ["/bin/sh", "-c"]
+        args: [
+          "vllm serve Qwen/Qwen2.5-7B-Instruct-GPTQ-Int4 --dtype=float16 --tensor-parallel-size 1 --max-model-len 4096 --max-num-batched-tokens 4096 --max-num-seqs 12 --trust-remote-code --quantization gptq --gpu-memory-utilization 0.70"
+        ]
+        env:
+        - name: HUGGING_FACE_HUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: hf-token-secret
+              key: token
+        ports:
+        - containerPort: 8000
+        resources:
+          limits:
+            cpu: "8"
+            memory: 16G
+            nvidia.com/gpu: "1"
+          requests:
+            cpu: "2"
+            memory: 6G
+            nvidia.com/gpu: "1"
+        volumeMounts:
+        - mountPath: /root/.cache/huggingface
+          name: cache-volume
+        - name: shm
+          mountPath: /dev/shm
+        # ← PAS DE PROBES pour laisser le temps

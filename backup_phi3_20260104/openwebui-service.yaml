@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","kind":"Service","metadata":{"annotations":{},"name":"openwebui-service","namespace":"vllm-chat"},"spec":{"ports":[{"name":"http","nodePort":30183,"port":8080,"targetPort":8080}],"selector":{"app":"openwebui"},"type":"NodePort"}}
+  creationTimestamp: "2026-01-03T22:49:54Z"
+  name: openwebui-service
+  namespace: vllm-chat
+  resourceVersion: "57385906"
+  uid: 52935e60-fdd4-4f71-906a-9bdc9cdf2808
+spec:
+  clusterIP: 10.105.199.96
+  clusterIPs:
+  - 10.105.199.96
+  externalTrafficPolicy: Cluster
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+  - name: http
+    nodePort: 30183
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app: openwebui
+  sessionAffinity: None
+  type: NodePort
+status:
+  loadBalancer: {}

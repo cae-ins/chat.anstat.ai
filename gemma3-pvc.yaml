@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gemma3-cache
+  namespace: vllm-chat
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path  # ← CHANGÉ
+  resources:
+    requests:
+      storage: 30Gi

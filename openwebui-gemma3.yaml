@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openwebui
+  namespace: vllm-chat
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: openwebui
+  template:
+    metadata:
+      labels:
+        app: openwebui
+    spec:
+      containers:
+      - name: openwebui
+        image: ghcr.io/open-webui/open-webui:main
+        ports:
+        - containerPort: 8080
+        env:
+        - name: OPENAI_API_BASE_URL
+          value: "http://gemma3-service:8000/v1"
+        - name: OPENAI_API_KEY
+          value: "sk-dummy"
+        - name: WEBUI_NAME
+          value: "Gemma 3 Chat"
+        volumeMounts:
+        - name: webui-data
+          mountPath: /app/backend/data
+      volumes:
+      - name: webui-data
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: openwebui-service
+  namespace: vllm-chat
+spec:
+  selector:
+    app: openwebui
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+    nodePort: 30183
+  type: NodePort
