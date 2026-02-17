@@ -1,0 +1,129 @@
+# Configuration de fine-tuning LoRA pour Phi-3.5-mini
+# ANSTAT AI - Méthodologies statistiques
+
+# =============================================================================
+# MODELE DE BASE
+# =============================================================================
+model:
+  name: "microsoft/Phi-3.5-mini-instruct"
+  trust_remote_code: true
+  torch_dtype: "bfloat16"
+  attn_implementation: "flash_attention_2"
+
+# =============================================================================
+# CONFIGURATION LORA
+# =============================================================================
+lora:
+  # Rang de la décomposition (plus élevé = plus de capacité mais plus de mémoire)
+  r: 16
+  # Facteur de scaling (généralement 2x le rang)
+  alpha: 32
+  # Dropout pour régularisation
+  dropout: 0.05
+  # Modules cibles pour Phi-3
+  target_modules:
+    - "q_proj"
+    - "k_proj"
+    - "v_proj"
+    - "o_proj"
+    - "gate_proj"
+    - "up_proj"
+    - "down_proj"
+  bias: "none"
+
+# =============================================================================
+# QUANTIFICATION (pour économiser la VRAM)
+# =============================================================================
+quantization:
+  # Activer pour entraînement sur GPU avec moins de 16 Go VRAM
+  use_4bit: false  # QLoRA - recommandé pour T4
+  use_8bit: false
+  # Configuration 4-bit
+  bnb_4bit_quant_type: "nf4"
+  bnb_4bit_compute_dtype: "bfloat16"
+  bnb_4bit_use_double_quant: true
+
+# =============================================================================
+# DONNEES
+# =============================================================================
+data:
+  train_path: "./data/methodologies_anstat.jsonl"
+  validation_path: null  # Optionnel
+  max_length: 2048
+
+# =============================================================================
+# ENTRAINEMENT
+# =============================================================================
+training:
+  output_dir: "./output/phi3-anstat-lora"
+  num_epochs: 3
+  batch_size: 4
+  gradient_accumulation_steps: 4
+  # Taille effective du batch = batch_size * gradient_accumulation_steps = 16
+
+  # Optimisation
+  learning_rate: 2.0e-4
+  weight_decay: 0.01
+  warmup_ratio: 0.03
+  lr_scheduler_type: "cosine"
+  max_grad_norm: 0.3
+
+  # Précision
+  fp16: false
+  bf16: true
+
+  # Mémoire
+  gradient_checkpointing: true
+
+  # Sauvegarde
+  save_steps: 100
+  save_total_limit: 3
+  logging_steps: 10
+
+# =============================================================================
+# CONFIGURATIONS PAR TYPE DE GPU
+# =============================================================================
+gpu_profiles:
+  # Pour 2x NVIDIA T4 (16 Go chacun)
+  t4:
+    quantization:
+      use_4bit: true
+    training:
+      batch_size: 2
+      gradient_accumulation_steps: 8
+      gradient_checkpointing: true
+    lora:
+      r: 8
+      alpha: 16
+
+  # Pour 2x NVIDIA A100 40GB
+  a100_40:
+    quantization:
+      use_4bit: false
+    training:
+      batch_size: 8
+      gradient_accumulation_steps: 2
+      gradient_checkpointing: false
+    lora:
+      r: 32
+      alpha: 64
+
+  # Pour 4x NVIDIA A100 80GB
+  a100_80:
+    quantization:
+      use_4bit: false
+    training:
+      batch_size: 16
+      gradient_accumulation_steps: 1
+      gradient_checkpointing: false
+    lora:
+      r: 64
+      alpha: 128
+
+# =============================================================================
+# METRIQUES ET LOGGING
+# =============================================================================
+logging:
+  report_to: "none"  # ou "wandb", "tensorboard"
+  logging_dir: "./logs"
+  logging_first_step: true

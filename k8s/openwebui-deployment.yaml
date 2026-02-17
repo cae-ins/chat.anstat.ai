@@ -1,0 +1,207 @@
+# openwebui-deployment.yaml
+# OpenWebUI personnalisé pour ANSTAT - Chat AI
+# Image: openwebui-anstat:latest (build depuis openwebui-custom/)
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openwebui
+  namespace: vllm-chat
+  labels:
+    app: openwebui
+    org: anstat
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: openwebui
+  template:
+    metadata:
+      labels:
+        app: openwebui
+        org: anstat
+    spec:
+      containers:
+      - name: openwebui
+        # Image personnalisée ANSTAT (voir openwebui-custom/Dockerfile)
+        image: openwebui-anstat:latest
+        imagePullPolicy: Never  # Image locale
+        ports:
+        - containerPort: 8080
+          name: http
+
+        env:
+        # ============================================
+        # BRANDING & IDENTIFICATION ANSTAT
+        # ============================================
+        - name: WEBUI_NAME
+          value: "ANSTAT AI"
+
+        # ============================================
+        # LOCALISATION - FRANÇAIS
+        # ============================================
+        - name: DEFAULT_LOCALE
+          value: "fr-FR"
+
+        # ============================================
+        # CONFIGURATION DES MODÈLES (Phi-3 + RAG)
+        # ============================================
+        - name: OPENAI_API_BASE_URLS
+          value: "http://qwen25-service:8000/v1;http://rag-api-service:8084/v1"
+        - name: OPENAI_API_KEYS
+          value: "sk-dummy;sk-dummy"
+        - name: DEFAULT_MODELS
+          value: "Qwen/Qwen2.5-7B-Instruct-AWQ"
+
+        # Filtrage des modèles - uniquement Phi-3 et RAG
+        - name: ENABLE_MODEL_FILTER
+          value: "true"
+        - name: MODEL_FILTER_LIST
+          value: "Qwen/Qwen2.5-7B-Instruct-AWQ;rag-anstat"
+
+        # Désactiver Ollama (on utilise vLLM)
+        - name: ENABLE_OLLAMA_API
+          value: "false"
+
+        # ============================================
+        # GESTION DES UTILISATEURS
+        # ============================================
+        - name: ENABLE_SIGNUP
+          value: "true"
+        - name: DEFAULT_USER_ROLE
+          value: "user"
+        - name: ENABLE_ADMIN_EXPORT
+          value: "true"
+        - name: SHOW_ADMIN_DETAILS
+          value: "true"
+        - name: ADMIN_EMAIL
+          value: "j.migone@stat.plan.gouv.ci"
+
+        # Compte admin par défaut (CHANGER LE MOT DE PASSE EN PROD!)
+        - name: WEBUI_ADMIN_EMAIL
+          value: "admin@anstat.ci"
+        - name: WEBUI_ADMIN_NAME
+          value: "Administrateur ANSTAT"
+        # - name: WEBUI_ADMIN_PASSWORD
+        #   valueFrom:
+        #     secretKeyRef:
+        #       name: openwebui-secrets
+        #       key: admin-password
+
+        # ============================================
+        # FONCTIONNALITÉS UI
+        # ============================================
+        - name: ENABLE_FOLDERS
+          value: "true"
+        - name: ENABLE_NOTES
+          value: "true"
+        - name: ENABLE_CHANNELS
+          value: "false"
+        - name: ENABLE_MEMORIES
+          value: "true"
+        - name: ENABLE_USER_STATUS
+          value: "true"
+        - name: ENABLE_VERSION_UPDATE_CHECK
+          value: "false"
+
+        # ============================================
+        # MESSAGES PERSONNALISÉS ANSTAT
+        # ============================================
+        - name: PENDING_USER_OVERLAY_TITLE
+          value: "Compte en attente de validation"
+        - name: PENDING_USER_OVERLAY_CONTENT
+          value: "Votre compte est en cours de validation par l'équipe ANSTAT. Vous recevrez une notification une fois approuvé. Pour toute question, contactez admin@anstat.ci"
+
+        # Watermark sur les copies
+        - name: RESPONSE_WATERMARK
+          value: "--- Généré par ANSTAT AI (chat.anstat.ci) ---"
+
+        # ============================================
+        # BANNIÈRE D'ACCUEIL
+        # ============================================
+        - name: WEBUI_BANNERS
+          value: '[{"id": "welcome", "type": "info", "title": "Bienvenue sur ANSTAT AI", "content": "Assistant IA de l''Agence Nationale de la Statistique. Pour toute question sur les données statistiques, utilisez le modèle RAG.", "dismissible": true, "timestamp": 1704067200}]'
+
+        # ============================================
+        # SUGGESTIONS DE PROMPTS PAR DÉFAUT
+        # ============================================
+        - name: DEFAULT_PROMPT_SUGGESTIONS
+          value: |-
+            [
+              {"title": ["Données", "statistiques"], "content": "Quelles sont les dernières statistiques disponibles sur l'emploi en Côte d'Ivoire ?"},
+              {"title": ["Analyse", "de données"], "content": "Peux-tu m'aider à analyser les données suivantes ?"},
+              {"title": ["Méthodologie", "ANSTAT"], "content": "Explique-moi la méthodologie utilisée pour calculer l'IPC."},
+              {"title": ["Indicateurs", "économiques"], "content": "Quels sont les principaux indicateurs économiques de la Côte d'Ivoire ?"}
+            ]
+
+        # ============================================
+        # SÉCURITÉ & PRODUCTION
+        # ============================================
+        - name: ENV
+          value: "prod"
+        - name: WEBUI_AUTH
+          value: "true"
+
+        # ============================================
+        # RESSOURCES
+        # ============================================
+        resources:
+          limits:
+            cpu: "2"
+            memory: 2Gi
+          requests:
+            cpu: "200m"
+            memory: 512Mi
+
+        # ============================================
+        # HEALTH CHECKS
+        # ============================================
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+        # ============================================
+        # VOLUMES
+        # ============================================
+        volumeMounts:
+        - name: webui-data
+          mountPath: /app/backend/data
+
+      volumes:
+      - name: webui-data
+        persistentVolumeClaim:
+          claimName: openwebui-data
+
+---
+# Service NodePort pour accès externe
+apiVersion: v1
+kind: Service
+metadata:
+  name: openwebui-service
+  namespace: vllm-chat
+  labels:
+    app: openwebui
+    org: anstat
+spec:
+  selector:
+    app: openwebui
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+    nodePort: 30189
+  type: NodePort

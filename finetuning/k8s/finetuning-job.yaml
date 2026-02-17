@@ -1,0 +1,107 @@
+# Job Kubernetes pour le fine-tuning LoRA de Phi-3.5-mini
+# ANSTAT AI - Méthodologies statistiques
+#
+# Usage: kubectl apply -f finetuning-job.yaml -n vllm-chat
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: phi3-finetuning-lora
+  namespace: vllm-chat
+  labels:
+    app: phi3-finetuning
+spec:
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 86400  # Supprime le job après 24h
+  template:
+    metadata:
+      labels:
+        app: phi3-finetuning
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: finetuning
+        image: anstat/phi3-finetuning:latest  # À construire avec le Dockerfile
+        command:
+        - python3
+        - train_lora.py
+        args:
+        - "--model_name=microsoft/Phi-3.5-mini-instruct"
+        - "--data_path=/data/methodologies_anstat.jsonl"
+        - "--output_dir=/output/phi3-anstat-lora"
+        - "--num_epochs=3"
+        - "--batch_size=2"
+        - "--lora_r=16"
+        - "--lora_alpha=32"
+        - "--use_4bit"  # QLoRA pour T4
+        - "--gradient_checkpointing"
+        env:
+        - name: HUGGING_FACE_HUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: hf-token-secret
+              key: token
+        - name: CUDA_VISIBLE_DEVICES
+          value: "0"
+        resources:
+          limits:
+            cpu: "8"
+            memory: "32Gi"
+            nvidia.com/gpu: "1"
+          requests:
+            cpu: "4"
+            memory: "16Gi"
+            nvidia.com/gpu: "1"
+        volumeMounts:
+        - name: data-volume
+          mountPath: /data
+        - name: output-volume
+          mountPath: /output
+        - name: cache-volume
+          mountPath: /root/.cache/huggingface
+        - name: shm
+          mountPath: /dev/shm
+      volumes:
+      - name: data-volume
+        persistentVolumeClaim:
+          claimName: finetuning-data
+      - name: output-volume
+        persistentVolumeClaim:
+          claimName: finetuning-output
+      - name: cache-volume
+        persistentVolumeClaim:
+          claimName: gemma3-cache  # Réutilise le cache existant
+      - name: shm
+        emptyDir:
+          medium: Memory
+          sizeLimit: 8Gi
+
+---
+# PVC pour les données de fine-tuning
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: finetuning-data
+  namespace: vllm-chat
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: local-path
+
+---
+# PVC pour la sortie du fine-tuning
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: finetuning-output
+  namespace: vllm-chat
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: local-path

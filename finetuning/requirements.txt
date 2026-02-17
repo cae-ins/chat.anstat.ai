@@ -1,0 +1,43 @@
+# Requirements pour le fine-tuning LoRA de Phi-3.5-mini
+# ANSTAT AI - Méthodologies statistiques
+
+# PyTorch (installer séparément avec CUDA)
+# pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+
+# Transformers et outils HuggingFace
+transformers>=4.40.0
+datasets>=2.18.0
+accelerate>=0.28.0
+huggingface_hub>=0.22.0
+
+# PEFT pour LoRA
+peft>=0.10.0
+
+# Quantification
+bitsandbytes>=0.43.0
+
+# Optimisations
+flash-attn>=2.5.0
+einops>=0.7.0
+
+# Utilitaires
+scipy>=1.12.0
+sentencepiece>=0.2.0
+protobuf>=4.25.0
+
+# Training
+trl>=0.8.0
+
+# Logging (optionnel)
+wandb>=0.16.0
+tensorboard>=2.16.0
+
+# Inférence post fine-tuning
+vllm>=0.4.0
+
+# YAML config
+pyyaml>=6.0
+
+# Parsing des documents (pour parse_methodologies.py)
+pymupdf>=1.24.0      # Lecture PDF
+python-docx>=1.1.0   # Lecture Word DOCX

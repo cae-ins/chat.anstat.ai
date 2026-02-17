@@ -1,0 +1,108 @@
+# Déploiement du modèle Phi-3.5-mini-ANSTAT (fine-tuné)
+# ANSTAT AI - Version avec méthodologies statistiques intégrées
+#
+# USAGE FUTUR: kubectl apply -f phi3-anstat-deployment.yaml -n vllm-chat
+# Ce fichier sera utilisé après le fine-tuning et la fusion LoRA
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: phi3-anstat
+  namespace: vllm-chat
+  labels:
+    app: phi3-anstat
+    version: finetuned
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: phi3-anstat
+  template:
+    metadata:
+      labels:
+        app: phi3-anstat
+        version: finetuned
+    spec:
+      containers:
+      - name: phi3-anstat
+        image: vllm/vllm-openai:v0.10.0
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          vllm serve /models/phi3-anstat-merged \
+            --dtype=float16 \
+            --tensor-parallel-size 1 \
+            --max-model-len 8192 \
+            --max-num-batched-tokens 8192 \
+            --max-num-seqs 12 \
+            --trust-remote-code \
+            --gpu-memory-utilization 0.80 \
+            --served-model-name phi3-anstat
+        env:
+        - name: HUGGING_FACE_HUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: hf-token-secret
+              key: token
+        ports:
+        - containerPort: 8000
+          name: http
+          protocol: TCP
+        resources:
+          limits:
+            cpu: "8"
+            memory: "16Gi"
+            nvidia.com/gpu: "1"
+          requests:
+            cpu: "2"
+            memory: "6Gi"
+            nvidia.com/gpu: "1"
+        volumeMounts:
+        - name: model-volume
+          mountPath: /models
+        - name: cache-volume
+          mountPath: /root/.cache/huggingface
+        - name: shm
+          mountPath: /dev/shm
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 120
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 60
+          periodSeconds: 10
+      volumes:
+      - name: model-volume
+        persistentVolumeClaim:
+          claimName: finetuning-output  # Contient le modèle fusionné
+      - name: cache-volume
+        persistentVolumeClaim:
+          claimName: gemma3-cache
+      - name: shm
+        emptyDir:
+          medium: Memory
+          sizeLimit: 4Gi
+
+---
+# Service pour le modèle fine-tuné
+apiVersion: v1
+kind: Service
+metadata:
+  name: phi3-anstat-service
+  namespace: vllm-chat
+  labels:
+    app: phi3-anstat
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  selector:
+    app: phi3-anstat

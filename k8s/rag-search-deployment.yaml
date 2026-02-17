@@ -1,0 +1,81 @@
+# rag-search-deployment.yaml
+# Service de recherche RAG (FAISS + reranking) - pas de GPU requis
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rag-search
+  namespace: vllm-chat
+  labels:
+    app: rag-search
+    org: anstat
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rag-search
+  template:
+    metadata:
+      labels:
+        app: rag-search
+        org: anstat
+    spec:
+      containers:
+      - name: rag-search
+        image: rag-search-anstat:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8084
+        env:
+        - name: TOP_K_SEARCH
+          value: "10"
+        - name: TOP_K_RERANK
+          value: "5"
+        - name: RERANKER_MODEL
+          value: "cross-encoder/ms-marco-MiniLM-L-2-v2"
+        - name: OMP_NUM_THREADS
+          value: "8"
+        - name: TOKENIZERS_PARALLELISM
+          value: "true"
+        - name: EMBEDDING_CACHE_SIZE
+          value: "512"
+        - name: UVICORN_WORKERS
+          value: "1"
+        resources:
+          limits:
+            cpu: "8"
+            memory: 8Gi
+          requests:
+            cpu: "2"
+            memory: 4Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8084
+          initialDelaySeconds: 120
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8084
+          initialDelaySeconds: 60
+          periodSeconds: 15
+          timeoutSeconds: 5
+          failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rag-search-service
+  namespace: vllm-chat
+  labels:
+    app: rag-search
+    org: anstat
+spec:
+  selector:
+    app: rag-search
+  ports:
+  - name: http
+    port: 8084
+    targetPort: 8084

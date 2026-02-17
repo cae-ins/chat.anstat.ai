@@ -1,0 +1,44 @@
+COMMANDE RECURRENTE LORS DE L INSTALLATION :
+
+- kubectl logs mistral-7b-86946867b6-pg9m9 -n vllm-chat
+- kubectl describe pods mistral-7b-86946867b6-pg9m9 -n vllm-chat
+- kubectl delete deployment mistral-7b -n vllm-chat
+- kubectl delete pods -n vllm-chat --all
+
+
+DETAILS DE L ARGUMENT :
+
+1- vllm serve TheBloke/Mistral-7B-Instruct-v0.2-GPTQ :
+C’est le nom du modèle sur HuggingFace qu on veut loader.
+vLLM va aller le télécharger, l’initialiser et l’exécuter comme un serveur API compatible OpenAI (/v1/completions, /v1/chat/completions, etc).
+
+2- --dtype=float16 :
+On forces le type numérique interne en float16 (FP16).
+C’est 2x moins de mémoire que float32, moins précis mais largement suffisant pour inference.
+Obligatoire sur T4 sinon tu exploses la VRAM.
+
+
+3- --tensor-parallel-size 2 :
+On utilise 2 GPUs en parallèle pour diviser le modèle.
+Un Mistral 7B quantisé en GPTQ + FP16 qu on réparti sur les 2 T4 pour la stabilité.
+
+4- --max-model-len 4096 :
+Longueur maximale de la fenetre de contexte du modèle : 4096
+Plus on montra, plus la VRAM demandée augmente exponentiellement.
+
+5- --max-num-batched-tokens 4096 :
+Nombre total de tokens qu’on peut servir en parallèle sur une batch.
+Doit être >= max-model-len sinon vLLM refuse.
+Ça détermine combien de requêtes simultanées haute charge on peut encaisser.
+
+6- --trust-remote-code :
+On autorise vLLM à exécuter le code python fourni par le repo HuggingFace du modèle.
+Sans ça beaucoup de modèles HF ne loaderont pas.
+
+7- --quantization gptq :
+On force l’utilisation du GPTQ quantization format.
+
+8- --gpu-memory-utilization 0.85
+
+On dit à vLLM : autorise utilisation jusqu’à 85% de la VRAM disponible.
+Très important pour éviter le CrashLoopBackOff.

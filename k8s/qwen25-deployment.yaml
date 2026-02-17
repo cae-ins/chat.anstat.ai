@@ -1,0 +1,109 @@
+# qwen25-deployment.yaml
+# Qwen2.5-7B-Instruct-AWQ (quantifié 4-bit) sur vLLM pour ANSTAT AI
+# GPU: NVIDIA T4 (14.5 Go VRAM utilisable)
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qwen25
+  namespace: vllm-chat
+  labels:
+    app: qwen25
+    org: anstat
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: qwen25
+  template:
+    metadata:
+      labels:
+        app: qwen25
+        org: anstat
+    spec:
+      containers:
+      - name: qwen25
+        image: vllm/vllm-openai:v0.10.0
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh", "-c"]
+        args:
+        - >
+          vllm serve Qwen/Qwen2.5-7B-Instruct-AWQ
+          --quantization awq
+          --dtype auto
+          --tensor-parallel-size 1
+          --max-model-len 8192
+          --max-num-batched-tokens 8192
+          --max-num-seqs 16
+          --trust-remote-code
+          --gpu-memory-utilization 0.90
+          --enforce-eager
+        env:
+        - name: HUGGING_FACE_HUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: token
+              name: hf-token-secret
+        ports:
+        - containerPort: 8000
+          protocol: TCP
+        resources:
+          limits:
+            cpu: "8"
+            memory: 20Gi
+            nvidia.com/gpu: "1"
+          requests:
+            cpu: "2"
+            memory: 8Gi
+            nvidia.com/gpu: "1"
+        volumeMounts:
+        - mountPath: /root/.cache/huggingface
+          name: cache-volume
+        - mountPath: /dev/shm
+          name: shm
+        # Health checks
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 300  # Qwen2.5 prend plus de temps à charger
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 180
+          periodSeconds: 15
+          timeoutSeconds: 5
+          failureThreshold: 3
+      volumes:
+      - name: cache-volume
+        persistentVolumeClaim:
+          claimName: gemma3-cache
+      - name: shm
+        emptyDir:
+          medium: Memory
+          sizeLimit: 6Gi
+      terminationGracePeriodSeconds: 60
+
+---
+# Service pour Qwen2.5
+apiVersion: v1
+kind: Service
+metadata:
+  name: qwen25-service
+  namespace: vllm-chat
+  labels:
+    app: qwen25
+    org: anstat
+spec:
+  selector:
+    app: qwen25
+  ports:
+  - name: http
+    port: 8000
+    targetPort: 8000
+    nodePort: 30179
+  type: NodePort

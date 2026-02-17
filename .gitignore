@@ -1,0 +1,44 @@
+# Secrets
+**/hf-secret.yaml
+token_chat.txt
+
+# Images et binaires
+*.png
+*.jpg
+*.jpeg
+*.ico
+*.gif
+*.bmp
+*.svg
+
+# Presentations et PDFs
+*.pdf
+*.pptx
+*.ppt
+*.html
+
+# Donnees lourdes
+*.npz
+*.npy
+*.bin
+*.json
+rag/data/
+archive/rag-service-v1/
+
+# Finetuning data
+finetuning/data/
+finetuning/methodologies_sources/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

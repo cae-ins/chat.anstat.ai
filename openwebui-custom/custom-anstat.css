@@ -1,0 +1,287 @@
+/*
+ * ANSTAT - Agence Nationale de la Statistique
+ * Thème personnalisé pour OpenWebUI
+ * Couleurs: Orange #E8923A / Vert foncé #3D5A4C
+ */
+
+:root {
+  /* Couleurs principales ANSTAT */
+  --anstat-orange: #E8923A;
+  --anstat-orange-light: #F5A855;
+  --anstat-orange-dark: #D4802E;
+  --anstat-green: #3D5A4C;
+  --anstat-green-light: #4A6D5C;
+  --anstat-green-dark: #2E4439;
+
+  /* Override des couleurs du thème */
+  --color-primary: var(--anstat-orange) !important;
+  --color-primary-hover: var(--anstat-orange-dark) !important;
+  --color-accent: var(--anstat-green) !important;
+}
+
+/* ============================================
+   HEADER & NAVIGATION
+   ============================================ */
+
+/* Logo et titre dans la sidebar */
+.sidebar-header,
+nav[class*="sidebar"] > div:first-child {
+  background: linear-gradient(135deg, var(--anstat-green) 0%, var(--anstat-green-dark) 100%) !important;
+}
+
+/* Boutons principaux */
+button[class*="primary"],
+.btn-primary,
+button.bg-black {
+  background-color: var(--anstat-orange) !important;
+  border-color: var(--anstat-orange) !important;
+}
+
+button[class*="primary"]:hover,
+.btn-primary:hover,
+button.bg-black:hover {
+  background-color: var(--anstat-orange-dark) !important;
+  border-color: var(--anstat-orange-dark) !important;
+}
+
+/* ============================================
+   CHAT INTERFACE
+   ============================================ */
+
+/* Logo ANSTAT en filigrane - DÉSACTIVÉ
+#chat-container,
+[class*="chat-container"],
+.relative.flex.h-full,
+main[class*="flex"] {
+  position: relative;
+}
+
+#chat-container::before,
+[class*="chat-container"]::before,
+.relative.flex.h-full::before,
+main[class*="flex"]::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: url('/static/logo-anstat.png');
+  background-size: 65%;
+  background-repeat: no-repeat;
+  background-position: center;
+  opacity: 0.06;
+  pointer-events: none;
+  z-index: 0;
+}
+*/
+
+/* Bouton d'envoi du message */
+button[type="submit"],
+button[aria-label*="Send"],
+button[aria-label*="Envoyer"] {
+  background-color: var(--anstat-orange) !important;
+}
+
+button[type="submit"]:hover,
+button[aria-label*="Send"]:hover,
+button[aria-label*="Envoyer"]:hover {
+  background-color: var(--anstat-orange-dark) !important;
+}
+
+/* Messages de l'assistant - accent vert */
+.message-assistant,
+[class*="assistant-message"],
+.prose {
+  --tw-prose-links: var(--anstat-orange);
+}
+
+/* Liens dans le chat */
+.prose a,
+a[class*="text-blue"] {
+  color: var(--anstat-orange) !important;
+}
+
+.prose a:hover {
+  color: var(--anstat-orange-dark) !important;
+}
+
+/* ============================================
+   SIDEBAR & NAVIGATION
+   ============================================ */
+
+/* Items de navigation actifs */
+.nav-item.active,
+[class*="sidebar"] button.active,
+[class*="sidebar"] a.active,
+li.active {
+  background-color: rgba(232, 146, 58, 0.15) !important;
+  border-left: 3px solid var(--anstat-orange) !important;
+}
+
+/* Hover sur les items de navigation */
+[class*="sidebar"] button:hover,
+[class*="sidebar"] a:hover {
+  background-color: rgba(232, 146, 58, 0.1) !important;
+}
+
+/* ============================================
+   FORMULAIRES & INPUTS
+   ============================================ */
+
+/* Focus des inputs */
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--anstat-orange) !important;
+  box-shadow: 0 0 0 2px rgba(232, 146, 58, 0.2) !important;
+  outline: none !important;
+}
+
+/* Checkbox et radio */
+input[type="checkbox"]:checked,
+input[type="radio"]:checked {
+  background-color: var(--anstat-orange) !important;
+  border-color: var(--anstat-orange) !important;
+}
+
+/* ============================================
+   MODALS & DIALOGS
+   ============================================ */
+
+/* Headers des modals */
+[class*="modal"] header,
+[class*="dialog"] header,
+.modal-header {
+  border-bottom-color: var(--anstat-orange) !important;
+}
+
+/* Boutons de confirmation */
+button[class*="confirm"],
+button[class*="save"],
+.btn-success {
+  background-color: var(--anstat-green) !important;
+  border-color: var(--anstat-green) !important;
+}
+
+button[class*="confirm"]:hover,
+button[class*="save"]:hover,
+.btn-success:hover {
+  background-color: var(--anstat-green-dark) !important;
+}
+
+/* ============================================
+   TAGS & BADGES
+   ============================================ */
+
+.badge,
+.tag,
+[class*="badge"],
+[class*="tag"] {
+  background-color: var(--anstat-green) !important;
+  color: white !important;
+}
+
+/* ============================================
+   LOADING & PROGRESS
+   ============================================ */
+
+/* Spinner de chargement */
+.spinner,
+[class*="loading"],
+.animate-spin {
+  border-top-color: var(--anstat-orange) !important;
+}
+
+/* Barre de progression */
+progress::-webkit-progress-value,
+.progress-bar {
+  background-color: var(--anstat-orange) !important;
+}
+
+/* ============================================
+   SCROLLBAR PERSONNALISÉE
+   ============================================ */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(61, 90, 76, 0.1);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--anstat-green-light);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--anstat-green);
+}
+
+/* ============================================
+   PAGE DE LOGIN
+   ============================================ */
+
+/* Logo sur la page de login */
+[class*="login"] img[alt*="logo"],
+[class*="auth"] img[alt*="logo"] {
+  content: url('/static/logo-anstat.png') !important;
+  max-width: 200px !important;
+}
+
+/* Bouton de connexion */
+[class*="login"] button[type="submit"],
+[class*="auth"] button[type="submit"] {
+  background: linear-gradient(135deg, var(--anstat-orange) 0%, var(--anstat-orange-dark) 100%) !important;
+  border: none !important;
+  font-weight: 600 !important;
+}
+
+/* ============================================
+   WELCOME SCREEN
+   ============================================ */
+
+/* Message de bienvenue */
+[class*="welcome"],
+[class*="empty-state"] {
+  color: var(--anstat-green) !important;
+}
+
+/* ============================================
+   DARK MODE ADJUSTMENTS
+   ============================================ */
+
+.dark {
+  --color-primary: var(--anstat-orange) !important;
+  --color-accent: var(--anstat-green-light) !important;
+}
+
+.dark button[class*="primary"],
+.dark .btn-primary {
+  background-color: var(--anstat-orange) !important;
+}
+
+.dark [class*="sidebar"] button.active,
+.dark [class*="sidebar"] a.active {
+  background-color: rgba(232, 146, 58, 0.2) !important;
+}
+
+/* ============================================
+   ANSTAT BRANDING FOOTER
+   ============================================ */
+
+/* Ajouter un petit badge ANSTAT en bas de la sidebar */
+[class*="sidebar"]::after {
+  content: "Propulsé par ANSTAT";
+  display: block;
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: var(--anstat-green-light);
+  opacity: 0.7;
+}
