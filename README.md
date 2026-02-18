@@ -304,7 +304,7 @@ kubectl logs -n cert-manager deployment/cert-manager
 
 ## Contacts
 
-- **Admin**: admin@anstat.ci
+- **Admin**: cae@stat.plan.gouv.ci
 
 ---
 
