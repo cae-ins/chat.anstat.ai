@@ -275,7 +275,7 @@ progress::-webkit-progress-value,
 
 /* Ajouter un petit badge ANSTAT en bas de la sidebar */
 [class*="sidebar"]::after {
-  content: "Propulsé par ANSTAT";
+  content: "By DataLab ANSTAT";
   display: block;
   position: absolute;
   bottom: 10px;

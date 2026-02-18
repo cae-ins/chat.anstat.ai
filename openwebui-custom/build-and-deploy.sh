@@ -70,15 +70,8 @@ if [ ! -f "favicon.ico" ]; then
 fi
 echo -e "${GREEN}✓ favicon.ico trouvé${NC}"
 
-# Créer favicon.png à partir de favicon.ico (pour le logo du chat et Apple touch icon)
-echo -e "${YELLOW}Création de favicon.png à partir de favicon.ico...${NC}"
-if command -v convert &> /dev/null; then
-    convert favicon.ico -resize 180x180 favicon.png
-    echo -e "${GREEN}✓ favicon.png créé avec ImageMagick${NC}"
-else
-    echo -e "${YELLOW}⚠ ImageMagick non installé. Copie de favicon.ico comme favicon.png...${NC}"
-    cp favicon.ico favicon.png
-fi
+# favicon.png est fourni directement (source de qualite superieure)
+echo -e "${GREEN}✓ favicon.png fourni directement (source PNG haute qualite)${NC}"
 
 echo -e "${GREEN}✓ Assets prêts${NC}"
 
@@ -116,10 +109,10 @@ if ! kubectl get namespace "$NAMESPACE" &> /dev/null; then
 fi
 
 # Appliquer le deployment
-kubectl apply -f ../openwebui-deployment.yaml
+kubectl apply -f ../k8s/openwebui-deployment.yaml
 
 # Appliquer l'Ingress
-kubectl apply -f ../ingress.yaml
+kubectl apply -f ../k8s/ingress.yaml
 
 # Redémarrer le deployment pour prendre la nouvelle image
 kubectl rollout restart deployment/openwebui -n "$NAMESPACE"

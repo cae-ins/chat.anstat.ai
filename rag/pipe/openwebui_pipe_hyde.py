@@ -1,12 +1,12 @@
 """
-title: RAG ANSTAT
-description: Recherche documentaire sur les publications statistiques ANSTAT avec RAG
+title: RAG ANSTAT - HyDE
+description: RAG avec HyDE (Hypothetical Document Embeddings) - meilleure recherche semantique
 author: ANSTAT
-version: 2.2
+version: 1.0
 """
 
 from pydantic import BaseModel, Field
-from typing import Optional, Union, Generator
+from typing import Union, Generator
 import requests
 import json
 import re
@@ -14,9 +14,9 @@ import re
 
 class Pipe:
     """
-    Pipe OpenWebUI pour le RAG ANSTAT.
-    Fait la recherche dans les documents, construit le prompt avec contexte,
-    et streame la reponse depuis Qwen2.5 directement via OpenWebUI.
+    Pipe OpenWebUI pour le RAG ANSTAT avec HyDE.
+    Avant de chercher dans FAISS, genere une reponse hypothetique via le LLM
+    et l'utilise comme query de recherche (meilleure correspondance semantique).
     """
 
     class Valves(BaseModel):
@@ -44,6 +44,10 @@ class Pipe:
             default=3,
             description="Nombre de sources a envoyer au LLM",
         )
+        HYDE_MAX_TOKENS: int = Field(
+            default=100,
+            description="Tokens max pour la reponse hypothetique HyDE",
+        )
         REQUEST_TIMEOUT: int = Field(
             default=90,
             description="Timeout en secondes pour les appels HTTP",
@@ -54,8 +58,50 @@ class Pipe:
 
     def pipes(self):
         return [
-            {"id": "rag-anstat", "name": "RAG ANSTAT"},
+            {"id": "rag-anstat-hyde", "name": "RAG ANSTAT - HyDE"},
         ]
+
+    def _generate_hyde_query(self, question: str) -> str:
+        """
+        HyDE : genere une reponse hypothetique a la question.
+        Cette reponse est utilisee comme query FAISS au lieu de la question brute,
+        car elle ressemble semantiquement bien plus aux vrais documents.
+        En cas d'echec, retourne la question originale (fallback transparent).
+        """
+        try:
+            resp = requests.post(
+                f"{self.valves.LLM_API_URL}/chat/completions",
+                json={
+                    "model": self.valves.LLM_MODEL,
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": (
+                                "Tu es un expert en statistiques de Cote d'Ivoire. "
+                                "Redige un court passage (2-3 phrases) dans le style d'un rapport "
+                                "statistique officiel, qui decrirait le contexte et les concepts "
+                                "lies a la question. "
+                                "N'invente aucun chiffre ni pourcentage precis. "
+                                "Concentre-toi sur le vocabulaire technique et thematique "
+                                "qui permettrait de retrouver les bons documents."
+                            ),
+                        },
+                        {"role": "user", "content": question},
+                    ],
+                    "max_tokens": self.valves.HYDE_MAX_TOKENS,
+                    "temperature": 0.5,
+                    "stream": False,
+                },
+                headers={"Content-Type": "application/json"},
+                timeout=30,
+            )
+            if resp.status_code == 200:
+                hyde_text = resp.json()["choices"][0]["message"]["content"].strip()
+                print(f"[HyDE] Reponse hypothetique : {hyde_text[:80]}...")
+                return hyde_text
+        except Exception as e:
+            print(f"[HyDE] Erreur, fallback sur question brute : {e}")
+        return question
 
     def _search(self, query: str) -> list:
         """Appelle le service de recherche RAG."""
@@ -81,9 +127,7 @@ class Pipe:
         Extrait les phrases contenant des chiffres/pourcentages/donnees.
         Cela aide le LLM a trouver les informations dans un texte dense.
         """
-        # Decouper en phrases (par point, point-virgule, retour a la ligne)
         sentences = re.split(r'(?<=[.;])\s+|\n+', text)
-
         key_sentences = []
         other_sentences = []
 
@@ -91,20 +135,18 @@ class Pipe:
             s = s.strip()
             if not s or len(s) < 15:
                 continue
-            # Une phrase est "cle" si elle contient un chiffre
             if re.search(r'\d', s):
                 key_sentences.append(s)
             else:
                 other_sentences.append(s)
 
-        # Construire le texte : phrases avec chiffres en premier, puis contexte
         result = ""
         if key_sentences:
             result += "DONNEES CHIFFREES :\n"
             result += "\n".join(f"  - {s}" for s in key_sentences)
         if other_sentences:
             result += "\n\nCONTEXTE :\n"
-            result += " ".join(other_sentences[:5])  # Max 5 phrases de contexte
+            result += " ".join(other_sentences[:5])
 
         return result if result else text[:1500]
 
@@ -136,46 +178,21 @@ class Pipe:
             text += f"{i}. {s['doc']} - page {s['page']}\n"
         return text
 
+    _CONVERSATIONAL_PATTERNS = re.compile(
+        r"^\s*(bonjour|bonsoir|salut|hello|hi|coucou|hey|"
+        r"merci|merci beaucoup|au revoir|bonne journee|bonne nuit|"
+        r"ok|oui|non|d'accord|super|parfait|bien|"
+        r"qui es-?tu|qu['\u2019]est[- ]ce que tu (fais|es)|"
+        r"comment (tu t['\u2019]appelles|vas-tu|ca va)|ca va)\s*[!?.]*\s*$",
+        re.IGNORECASE,
+    )
+
     def _is_conversational(self, question: str) -> bool:
-        """
-        Utilise le LLM pour determiner si le message necessite une recherche documentaire.
-        Appel non-streaming, max 5 tokens, timeout court.
-        Fallback sur heuristique simple en cas d'echec.
-        """
-        try:
-            resp = requests.post(
-                f"{self.valves.LLM_API_URL}/chat/completions",
-                json={
-                    "model": self.valves.LLM_MODEL,
-                    "messages": [
-                        {
-                            "role": "system",
-                            "content": (
-                                "Reponds uniquement par OUI ou NON. "
-                                "Est-ce que ce message necessite une recherche dans des documents "
-                                "statistiques officiels (rapports, enquetes, donnees chiffrees) ? "
-                                "NON si c'est une salutation, une question sur toi-meme, ou un message conversationnel. "
-                                "OUI si c'est une question sur des donnees, statistiques, ou informations factuelles."
-                            ),
-                        },
-                        {"role": "user", "content": question},
-                    ],
-                    "max_tokens": 5,
-                    "temperature": 0.0,
-                    "stream": False,
-                },
-                headers={"Content-Type": "application/json"},
-                timeout=10,
-            )
-            if resp.status_code == 200:
-                answer = resp.json()["choices"][0]["message"]["content"].strip().upper()
-                print(f"[Intent] '{question[:50]}' → {answer}")
-                return answer.startswith("NON")
-        except Exception as e:
-            print(f"[Intent] Erreur classifieur, fallback heuristique : {e}")
-        # Fallback : message court sans mot-cle documentaire
+        """Detecte les messages conversationnels qui ne necessitent pas de RAG."""
         q = question.strip()
-        return len(q.split()) <= 4 and not re.search(r'\d|taux|donnee|rapport|enquete|statistique', q, re.IGNORECASE)
+        if len(q.split()) <= 3 and not re.search(r'\d|combien|quel|quelle|comment|pourquoi|quand|ou ', q, re.IGNORECASE):
+            return True
+        return bool(self._CONVERSATIONAL_PATTERNS.match(q))
 
     def _stream_direct(self, question: str) -> Generator:
         """Appelle le LLM sans contexte RAG pour les messages conversationnels."""
@@ -221,11 +238,12 @@ class Pipe:
 
     def pipe(self, body: dict) -> Union[str, Generator]:
         """
-        Pipeline RAG complet :
-        1. Recherche dans les documents (FAISS + reranking)
-        2. Extraction des phrases cles avec chiffres
-        3. Construction du prompt
-        4. Streaming depuis Qwen2.5
+        Pipeline RAG + HyDE :
+        1. Detection conversationnelle (bypass RAG)
+        2. Generation d'une reponse hypothetique (HyDE)
+        3. Recherche FAISS avec la reponse hypothetique
+        4. Construction du prompt avec les sources
+        5. Streaming de la reponse finale depuis Qwen2.5
         """
         messages = body.get("messages", [])
         if not messages:
@@ -235,16 +253,19 @@ class Pipe:
         if not question.strip():
             return "Veuillez poser une question."
 
-        print(f"[RAG Pipe] Question: {question[:100]}...")
+        print(f"[HyDE Pipe] Question: {question[:100]}...")
 
-        # Bypass RAG pour les messages conversationnels
+        # 1. Bypass RAG pour les messages conversationnels
         if self._is_conversational(question):
-            print(f"[RAG Pipe] Message conversationnel, pas de RAG")
+            print(f"[HyDE Pipe] Message conversationnel, pas de RAG")
             return self._stream_direct(question)
 
-        # 1. Recherche documentaire
-        sources = self._search(question)
-        print(f"[RAG Pipe] {len(sources)} sources trouvees")
+        # 2. HyDE : generer une reponse hypothetique pour ameliorer la recherche
+        search_query = self._generate_hyde_query(question)
+
+        # 3. Recherche documentaire avec la query HyDE
+        sources = self._search(search_query)
+        print(f"[HyDE Pipe] {len(sources)} sources trouvees")
 
         if not sources:
             return (
@@ -252,11 +273,11 @@ class Pipe:
                 "Le service de recherche est peut-etre indisponible."
             )
 
-        # 2. Construire le prompt avec contexte
+        # 4. Construire le prompt avec la question originale (pas la query HyDE)
         rag_prompt = self._build_prompt(question, sources)
         sources_text = self._format_sources(sources)
 
-        # 3. Appeler Qwen2.5 en streaming
+        # 5. Streaming depuis Qwen2.5
         system_message = (
             "Tu es l'assistant documentaire de l'ANSTAT "
             "(Agence Nationale de la Statistique de Cote d'Ivoire). "
@@ -281,7 +302,6 @@ class Pipe:
                         ],
                         "max_tokens": self.valves.LLM_MAX_TOKENS,
                         "temperature": self.valves.LLM_TEMPERATURE,
-                        "repetition_penalty": 1.15,
                         "stream": True,
                     },
                     headers={"Content-Type": "application/json"},
@@ -311,7 +331,7 @@ class Pipe:
                 yield sources_text
 
             except Exception as e:
-                print(f"[RAG Pipe] Stream error: {e}")
+                print(f"[HyDE Pipe] Stream error: {e}")
                 yield f"\n\nErreur lors de la generation: {e}"
 
         return stream_response()

@@ -1,0 +1,118 @@
+# neo4j-deployment.yaml
+# Base de données graphe Neo4j pour le Graph RAG ANSTAT
+# Community Edition (gratuite)
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: neo4j
+  namespace: vllm-chat
+  labels:
+    app: neo4j
+    org: anstat
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: neo4j
+  template:
+    metadata:
+      labels:
+        app: neo4j
+        org: anstat
+    spec:
+      containers:
+      - name: neo4j
+        image: neo4j:5-community
+        ports:
+        - containerPort: 7474
+          name: http
+        - containerPort: 7687
+          name: bolt
+
+        env:
+        - name: NEO4J_AUTH
+          value: "neo4j/anstat2024"        # Mot de passe à changer en prod
+        - name: NEO4J_PLUGINS
+          value: '["apoc"]'               # Plugin APOC pour requêtes avancées
+        - name: NEO4J_dbms_memory_heap_max__size
+          value: "1G"
+        - name: NEO4J_dbms_memory_pagecache_size
+          value: "512M"
+
+        resources:
+          limits:
+            cpu: "2"
+            memory: 2Gi
+          requests:
+            cpu: "200m"
+            memory: 1Gi
+
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 7474
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 5
+
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 7474
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 5
+
+        volumeMounts:
+        - name: neo4j-data
+          mountPath: /data
+
+      volumes:
+      - name: neo4j-data
+        persistentVolumeClaim:
+          claimName: neo4j-data
+
+---
+# Service interne (Bolt pour les appels API)
+apiVersion: v1
+kind: Service
+metadata:
+  name: neo4j-service
+  namespace: vllm-chat
+  labels:
+    app: neo4j
+    org: anstat
+spec:
+  selector:
+    app: neo4j
+  ports:
+  - name: bolt
+    port: 7687
+    targetPort: 7687
+  - name: http
+    port: 7474
+    targetPort: 7474
+  type: ClusterIP
+
+---
+# Service NodePort pour accéder au navigateur Neo4j depuis le réseau local
+apiVersion: v1
+kind: Service
+metadata:
+  name: neo4j-browser
+  namespace: vllm-chat
+  labels:
+    app: neo4j
+    org: anstat
+spec:
+  selector:
+    app: neo4j
+  ports:
+  - name: http
+    port: 7474
+    targetPort: 7474
+    nodePort: 30474
+  type: NodePort
